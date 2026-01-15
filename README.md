@@ -1,3 +1,5 @@
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=MelissaFrncJrg_DevOps_Course-CloudNativeApplicationCurse)](https://sonarcloud.io/summary/new_code?id=MelissaFrncJrg_DevOps_Course-CloudNativeApplicationCurse)
+
 ## Git workflow
 
 - Main branches: `main`, `develop`
