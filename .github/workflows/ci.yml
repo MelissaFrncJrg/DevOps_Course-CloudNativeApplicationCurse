@@ -87,7 +87,7 @@ jobs:
       - name: Install backend deps
         run: |
           cd backend
-          npm ci
+          npm i
 
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
