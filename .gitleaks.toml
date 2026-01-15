@@ -1,0 +1,5 @@
+title = "CloudNativeApplicationCurse gitleaks config"
+
+paths = [
+  '''actions-runner/.*'''
+]

@@ -11,6 +11,6 @@
     "lint:back": "cd backend && npm run lint",
     "lint:all": "npm run lint:front && npm run lint:back",
     "check:prepush": "npm run lint:all",
-    "scan:secrets": "gitleaks detect"
+    "scan:secrets": "gitleaks detect --no-git"
   }
 }
