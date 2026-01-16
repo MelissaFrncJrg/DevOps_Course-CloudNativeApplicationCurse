@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [ develop, feature/ci-pipeline ]
+    branches:
+      - '**'
   pull_request:
-    branches: [ develop ]
+    branches:
+      - '**'
 
 jobs:
   lint:
@@ -100,3 +102,125 @@ jobs:
             -Dsonar.projectKey=MelissaFrncJrg_DevOps_Course-CloudNativeApplicationCurse
             -Dsonar.sources=backend/src
             -Dsonar.language=js
+
+  docker:
+    runs-on: self-hosted
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker builder
+        run: |
+          # Use default docker driver to ensure images are loaded locally
+          docker buildx use default || true
+
+      - name: Build backend image
+        run: docker build -t backend-ci:latest ./backend
+
+      - name: Build frontend image
+        run: docker build --build-arg VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }} -t frontend-ci:latest ./frontend
+
+      - name: Run backend container (healthcheck)
+        run: |
+          docker run -d --rm \
+            --name backend-ci-test \
+            -p 3000:3000 \
+            -e DATABASE_URL="postgresql://user:password@localhost:5432/testdb" \
+            -e NODE_ENV=production \
+            -e PORT=3000 \
+            backend-ci
+
+          # Wait for backend to be healthy
+          echo "Waiting for backend to start..."
+          sleep 10
+
+          for i in {1..20}; do
+            if curl -fsS http://localhost:3000/health >/dev/null 2>&1; then
+              echo "✓ Backend is healthy"
+              docker stop backend-ci-test
+              exit 0
+            fi
+            echo "Attempt $i/20: Waiting for backend..."
+            sleep 3
+          done
+
+          # If we get here, healthcheck failed
+          echo "✗ Backend healthcheck failed"
+          docker logs backend-ci-test
+          docker stop backend-ci-test
+          exit 1
+
+      - name: Run frontend container (healthcheck)
+        run: |
+          docker run -d --rm \
+            --name frontend-ci-test \
+            -p 8080:80 \
+            frontend-ci
+
+          # Wait for frontend to be healthy
+          echo "Waiting for frontend to start..."
+          sleep 5
+
+          for i in {1..20}; do
+            if curl -fsS http://localhost:8080 >/dev/null 2>&1; then
+              echo "✓ Frontend is healthy"
+              docker stop frontend-ci-test
+              exit 0
+            fi
+            echo "Attempt $i/20: Waiting for frontend..."
+            sleep 3
+          done
+
+          # If we get here, healthcheck failed
+          echo "✗ Frontend healthcheck failed"
+          docker logs frontend-ci-test
+          docker stop frontend-ci-test
+          exit 1
+
+      - name: Set lowercase repository owner
+        id: repo
+        run: echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Verify images exist
+        run: |
+          echo "Listing all Docker images:"
+          docker images
+          echo "Checking for backend-ci and frontend-ci:"
+          docker images | grep -E "(backend-ci|frontend-ci)" || echo "Images not found!"
+
+      - name: Clean Docker credentials
+        run: |
+          # Remove any existing credentials that might cause GPG issues
+          rm -f ~/.docker/config.json
+          mkdir -p ~/.docker
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Tag and push backend image
+        env:
+          REGISTRY: ghcr.io
+          IMAGE_NAME: ${{ steps.repo.outputs.owner }}/cloudnative-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker tag backend-ci:latest ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+          docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: Tag and push frontend image
+        env:
+          REGISTRY: ghcr.io
+          IMAGE_NAME: ${{ steps.repo.outputs.owner }}/cloudnative-frontend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker tag frontend-ci:latest ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+          docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: Logout from GHCR
+        if: always()
+        run: docker logout ghcr.io
