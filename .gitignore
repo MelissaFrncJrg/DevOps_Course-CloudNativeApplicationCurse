@@ -3,7 +3,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
+# package-lock.json should be committed for production
 yarn.lock
 
 # Runtime data
@@ -106,7 +106,7 @@ ehthumbs.db
 Thumbs.db
 
 # Docker
-.dockerignore
+# .dockerignore should be committed
 
 # Database
 *.sqlite
