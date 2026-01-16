@@ -180,12 +180,16 @@ jobs:
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      - name: Set lowercase repository owner
+        id: repo
+        run: echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Tag and push backend image
         run: |
-          docker tag backend-ci ghcr.io/${{ github.repository_owner }}/cloudnative-backend:${{ github.sha }}
-          docker push ghcr.io/${{ github.repository_owner }}/cloudnative-backend:${{ github.sha }}
+          docker tag backend-ci ghcr.io/${{ steps.repo.outputs.owner }}/cloudnative-backend:${{ github.sha }}
+          docker push ghcr.io/${{ steps.repo.outputs.owner }}/cloudnative-backend:${{ github.sha }}
 
       - name: Tag and push frontend image
         run: |
-          docker tag frontend-ci ghcr.io/${{ github.repository_owner }}/cloudnative-frontend:${{ github.sha }}
-          docker push ghcr.io/${{ github.repository_owner }}/cloudnative-frontend:${{ github.sha }}
+          docker tag frontend-ci ghcr.io/${{ steps.repo.outputs.owner }}/cloudnative-frontend:${{ github.sha }}
+          docker push ghcr.io/${{ steps.repo.outputs.owner }}/cloudnative-frontend:${{ github.sha }}
